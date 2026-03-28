@@ -3,7 +3,7 @@
  * @Autor: taotao.wu
  * @Date: 2026-03-28 20:30:57
  * @LastEditors: taotao.wu
- * @LastEditTime: 2026-03-28 23:53:23
+ * @LastEditTime: 2026-03-29 00:02:20
  */
 
 import 'package:flutter/material.dart';
@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '计划&纪念日',
+      title: 'Ark Grids',
       // 添加本地化代理
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
