@@ -3,7 +3,7 @@
  * @Autor: taotao.wu
  * @Date: 2026-03-28 20:30:57
  * @LastEditors: taotao.wu
- * @LastEditTime: 2026-03-28 23:05:39
+ * @LastEditTime: 2026-03-28 23:35:15
  */
 
 import 'package:flutter/material.dart';
@@ -66,9 +66,10 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 完全删除 AppBar
-      appBar: null,
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      // 添加 SafeArea 防止内容被摄像头遮挡
+      body: SafeArea(
+        child: IndexedStack(index: _currentIndex, children: _pages),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           if (_currentIndex == 0) {
