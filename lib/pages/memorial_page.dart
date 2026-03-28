@@ -229,6 +229,7 @@ class MemorialDayPageState extends State<MemorialDayPage>
   int? selectedIndex;
   Set<int> fadingItems = {};
   int _totalCount = 0;
+  bool _isDragging = false;
 
   @override
   void initState() {
@@ -245,6 +246,12 @@ class MemorialDayPageState extends State<MemorialDayPage>
     });
   }
 
+  Future<void> saveList() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> result = days.map((e) => jsonEncode(e)).toList();
+    await prefs.setStringList("memorialDays", result);
+  }
+
   Future<void> deleteItem(int index) async {
     setState(() => fadingItems.add(index));
     await Future.delayed(const Duration(milliseconds: 300));
@@ -258,6 +265,15 @@ class MemorialDayPageState extends State<MemorialDayPage>
     await prefs.setStringList(
       "memorialDays",
       days.map((e) => jsonEncode(e)).toList(),
+    );
+  }
+
+  void _editMemorialDay(int index) {
+    MemorialDayPage.addMemorialDay(
+      context,
+      widget.key as GlobalKey<MemorialDayPageState>,
+      editItem: days[index],
+      editIndex: index,
     );
   }
 
@@ -381,6 +397,7 @@ class MemorialDayPageState extends State<MemorialDayPage>
   }
 
   void _showLongPressMenu(int index) {
+    if (_isDragging) return;
     setState(() => selectedIndex = index);
 
     showModalBottomSheet(
@@ -411,7 +428,6 @@ class MemorialDayPageState extends State<MemorialDayPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 顶部指示条
               Container(
                 margin: const EdgeInsets.only(top: 12),
                 width: 40,
@@ -422,7 +438,6 @@ class MemorialDayPageState extends State<MemorialDayPage>
                 ),
               ),
               const SizedBox(height: 16),
-              // 标题
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
@@ -460,7 +475,6 @@ class MemorialDayPageState extends State<MemorialDayPage>
               ),
               const SizedBox(height: 12),
               const Divider(height: 1),
-
               _buildMenuItem(
                 icon: Icons.edit,
                 iconColor: const Color(0xFF667EEA),
@@ -468,12 +482,7 @@ class MemorialDayPageState extends State<MemorialDayPage>
                 subtitle: "修改名称或日期",
                 onTap: () {
                   Navigator.pop(context);
-                  MemorialDayPage.addMemorialDay(
-                    context,
-                    widget.key as GlobalKey<MemorialDayPageState>,
-                    editItem: days[index],
-                    editIndex: index,
-                  );
+                  _editMemorialDay(index);
                   setState(() => selectedIndex = null);
                 },
               ),
@@ -488,9 +497,7 @@ class MemorialDayPageState extends State<MemorialDayPage>
                 },
                 isDestructive: true,
               ),
-
               const SizedBox(height: 8),
-              // 取消按钮
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                 child: ElevatedButton(
@@ -676,12 +683,46 @@ class MemorialDayPageState extends State<MemorialDayPage>
                         ],
                       ),
                     )
-                  : ListView.builder(
+                  : ReorderableListView.builder(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
                       ),
                       itemCount: days.length,
+                      buildDefaultDragHandles: false,
+                      proxyDecorator: (child, index, animation) {
+                        return AnimatedBuilder(
+                          animation: animation,
+                          builder: (context, child) {
+                            final value = CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutBack,
+                            ).value;
+                            return Transform.scale(
+                              scale: 0.95 + (value * 0.05),
+                              child: Material(
+                                elevation: 8,
+                                color: Colors.transparent,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: child,
+                        );
+                      },
+                      onReorderStart: (index) {
+                        _isDragging = true;
+                      },
+                      onReorder: (oldIndex, newIndex) {
+                        if (newIndex > oldIndex) newIndex--;
+                        final item = days.removeAt(oldIndex);
+                        days.insert(newIndex, item);
+                        setState(() {});
+                      },
+                      onReorderEnd: (index) async {
+                        await saveList();
+                        _isDragging = false;
+                      },
                       itemBuilder: (c, i) {
                         final item = days[i];
                         final date = DateTime.parse(item["date"]);
@@ -693,179 +734,202 @@ class MemorialDayPageState extends State<MemorialDayPage>
                             daysPassed.contains("天") &&
                             !daysPassed.contains("还有");
 
-                        return TweenAnimationBuilder(
-                          key: ValueKey(item["title"] + i.toString()),
-                          duration: const Duration(milliseconds: 300),
-                          tween: Tween<double>(begin: 0, end: 1),
-                          builder: (context, value, child) {
-                            return Transform.translate(
-                              offset: Offset(0, 20 * (1 - value)),
-                              child: Opacity(opacity: value, child: child),
-                            );
-                          },
-                          child: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 300),
-                            opacity: isFading ? 0.0 : 1.0,
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: GestureDetector(
-                                onDoubleTap: () => _showLongPressMenu(i),
-                                onTap: () =>
-                                    setState(() => selectedIndex = null),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  transform: Matrix4.identity()
-                                    ..scale(isSelected ? 1.02 : 1.0),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Card(
-                                      color: Colors.white,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
+                        return Container(
+                          key: ValueKey(
+                            item["title"] + i.toString() + item["date"],
+                          ), // 添加 key
+                          child: ReorderableDragStartListener(
+                            index: i,
+                            child: TweenAnimationBuilder(
+                              duration: const Duration(milliseconds: 300),
+                              tween: Tween<double>(begin: 0, end: 1),
+                              builder: (context, value, child) {
+                                return Transform.translate(
+                                  offset: Offset(0, 20 * (1 - value)),
+                                  child: Opacity(opacity: value, child: child),
+                                );
+                              },
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 300),
+                                opacity: isFading ? 0.0 : 1.0,
+                                child: GestureDetector(
+                                  onDoubleTap: () => _showLongPressMenu(i),
+                                  onTap: () =>
+                                      setState(() => selectedIndex = null),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    transform: Matrix4.identity()
+                                      ..scale(isSelected ? 1.02 : 1.0),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.05,
+                                            ),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
-                                      child: Container(
-                                        decoration: BoxDecoration(
+                                      child: Card(
+                                        color: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                            colors: [
-                                              Colors.white,
-                                              isSelected
-                                                  ? Colors.pink.shade50
-                                                  : Colors.grey.shade50,
-                                            ],
-                                          ),
                                         ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.all(
-                                                  10,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: isToday
-                                                        ? [
-                                                            Colors
-                                                                .pink
-                                                                .shade100,
-                                                            Colors
-                                                                .pink
-                                                                .shade200,
-                                                          ]
-                                                        : [
-                                                            Colors
-                                                                .purple
-                                                                .shade50,
-                                                            Colors
-                                                                .purple
-                                                                .shade100,
-                                                          ],
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Colors.white,
+                                                isSelected
+                                                    ? Colors.pink.shade50
+                                                    : Colors.grey.shade50,
+                                              ],
+                                            ),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(16),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(
+                                                    10,
                                                   ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(16),
-                                                ),
-                                                child: Icon(
-                                                  isToday
-                                                      ? Icons.today
-                                                      : Icons.celebration,
-                                                  color: isToday
-                                                      ? Colors.pink.shade700
-                                                      : Colors.purple.shade400,
-                                                  size: 24,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 16),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      item["title"] ?? "",
-                                                      style: TextStyle(
-                                                        fontSize: 18,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: Colors.grey[800],
-                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      colors: isToday
+                                                          ? [
+                                                              Colors
+                                                                  .pink
+                                                                  .shade100,
+                                                              Colors
+                                                                  .pink
+                                                                  .shade200,
+                                                            ]
+                                                          : [
+                                                              Colors
+                                                                  .purple
+                                                                  .shade50,
+                                                              Colors
+                                                                  .purple
+                                                                  .shade100,
+                                                            ],
                                                     ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      _getYearMonthDay(date),
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.grey[500],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 6,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: isPast
-                                                        ? [
-                                                            Colors.blue.shade50,
-                                                            Colors
-                                                                .blue
-                                                                .shade100,
-                                                          ]
-                                                        : isToday
-                                                        ? [
-                                                            Colors.pink.shade50,
-                                                            Colors
-                                                                .pink
-                                                                .shade100,
-                                                          ]
-                                                        : [
-                                                            Colors
-                                                                .orange
-                                                                .shade50,
-                                                            Colors
-                                                                .orange
-                                                                .shade100,
-                                                          ],
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
                                                   ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
-                                                ),
-                                                child: Text(
-                                                  daysPassed,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: isPast
-                                                        ? Colors.blue.shade700
-                                                        : isToday
+                                                  child: Icon(
+                                                    isToday
+                                                        ? Icons.today
+                                                        : Icons.celebration,
+                                                    color: isToday
                                                         ? Colors.pink.shade700
                                                         : Colors
-                                                              .orange
-                                                              .shade700,
+                                                              .purple
+                                                              .shade400,
+                                                    size: 24,
                                                   ),
                                                 ),
-                                              ),
-                                            ],
+                                                const SizedBox(width: 16),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        item["title"] ?? "",
+                                                        style: TextStyle(
+                                                          fontSize: 18,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color:
+                                                              Colors.grey[800],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        _getYearMonthDay(date),
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Colors.grey[500],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      colors: isPast
+                                                          ? [
+                                                              Colors
+                                                                  .blue
+                                                                  .shade50,
+                                                              Colors
+                                                                  .blue
+                                                                  .shade100,
+                                                            ]
+                                                          : isToday
+                                                          ? [
+                                                              Colors
+                                                                  .pink
+                                                                  .shade50,
+                                                              Colors
+                                                                  .pink
+                                                                  .shade100,
+                                                            ]
+                                                          : [
+                                                              Colors
+                                                                  .orange
+                                                                  .shade50,
+                                                              Colors
+                                                                  .orange
+                                                                  .shade100,
+                                                            ],
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          20,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    daysPassed,
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: isPast
+                                                          ? Colors.blue.shade700
+                                                          : isToday
+                                                          ? Colors.pink.shade700
+                                                          : Colors
+                                                                .orange
+                                                                .shade700,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
