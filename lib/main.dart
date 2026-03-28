@@ -1,3 +1,11 @@
+/*
+ * @Description: main
+ * @Autor: taotao.wu
+ * @Date: 2026-03-28 20:30:57
+ * @LastEditors: taotao.wu
+ * @LastEditTime: 2026-03-28 23:05:39
+ */
+
 import 'package:flutter/material.dart';
 import 'pages/plan_page.dart';
 import 'pages/memorial_page.dart';
@@ -13,7 +21,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '计划&纪念日',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+        fontFamily: 'PingFang SC',
+      ),
       home: const HomePage(),
     );
   }
@@ -45,73 +57,18 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _currentPlanType = type;
     });
-    _planKey.currentState?.changePlanType(type);
+    // 确保 PlanPageState 存在且已初始化
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _planKey.currentState?.changePlanType(type);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.settings),
-          onPressed: () {
-            if (_currentIndex == 0) {
-              showModalBottomSheet(
-                context: context,
-                builder: (context) => SafeArea(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ListTile(
-                        title: const Text("收集箱"),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _updatePlanType("collect");
-                        },
-                      ),
-                      ListTile(
-                        title: const Text("收货箱"),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _updatePlanType("done");
-                        },
-                      ),
-                      ListTile(
-                        title: const Text("垃圾箱"),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _updatePlanType("deleted");
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-          },
-        ),
-        title: _currentIndex == 0
-            ? GestureDetector(
-                onTap: () {
-                  if (_currentPlanType == "collect") {
-                    _updatePlanType("done");
-                  } else if (_currentPlanType == "done") {
-                    _updatePlanType("collect");
-                  } else if (_currentPlanType == "deleted") {
-                    _updatePlanType("collect");
-                  }
-                },
-                child: Text(
-                  _currentPlanType == "collect"
-                      ? "收集箱"
-                      : _currentPlanType == "done"
-                      ? "收货箱"
-                      : "垃圾箱",
-                ),
-              )
-            : const Text("纪念日"),
-        centerTitle: true,
-      ),
+      // 完全删除 AppBar
+      appBar: null,
+      body: IndexedStack(index: _currentIndex, children: _pages),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           if (_currentIndex == 0) {
@@ -121,18 +78,22 @@ class _HomePageState extends State<HomePage> {
           }
         },
         child: const Icon(Icons.add),
+        elevation: 4,
       ),
-      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) {
-          if (i == 0) {
-            _updatePlanType("collect");
-          }
           setState(() {
             _currentIndex = i;
+            if (i == 0) {
+              // 切换到计划页面时，重置为收集箱
+              _updatePlanType("collect");
+            }
           });
         },
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: "计划"),
           BottomNavigationBarItem(
