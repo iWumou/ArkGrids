@@ -23,5 +23,7 @@
 
 ### 安装步骤
 ```bash
-flutter pub get
-flutter run
+flutter pub get # 获取依赖
+flutter run # 运行项目
+flutter build apk # 生成 APK
+flutter pub run flutter_launcher_icons # 生成图标
