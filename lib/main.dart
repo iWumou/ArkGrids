@@ -3,7 +3,7 @@
  * @Autor: taotao.wu
  * @Date: 2026-03-28 20:30:57
  * @LastEditors: taotao.wu
- * @LastEditTime: 2026-03-29 00:02:20
+ * @LastEditTime: 2026-03-29 00:04:49
  */
 
 import 'package:flutter/material.dart';
@@ -89,28 +89,61 @@ class _HomePageState extends State<HomePage> {
         },
         child: const Icon(Icons.add),
         elevation: 4,
+        backgroundColor: const Color(0xFF667EEA),
+        foregroundColor: Colors.white,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) {
-          setState(() {
-            _currentIndex = i;
-            if (i == 0) {
-              // 切换到计划页面时，重置为收集箱
-              _updatePlanType("collect");
-            }
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: "计划"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: "纪念日",
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFFF8F9FF),
+              const Color(0xFFF0F2F8),
+              Colors.white,
+            ],
+            stops: const [0.0, 0.5, 1.0],
           ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) {
+            setState(() {
+              _currentIndex = i;
+              if (i == 0) {
+                // 切换到计划页面时，重置为收集箱
+                _updatePlanType("collect");
+              }
+            });
+          },
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedItemColor: const Color(0xFF667EEA),
+          unselectedItemColor: Colors.grey[500],
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.normal,
+            fontSize: 12,
+          ),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: "计划"),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today),
+              label: "纪念日",
+            ),
+          ],
+        ),
       ),
     );
   }
