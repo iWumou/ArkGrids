@@ -3,10 +3,11 @@
  * @Autor: taotao.wu
  * @Date: 2026-03-28 20:30:57
  * @LastEditors: taotao.wu
- * @LastEditTime: 2026-03-28 23:35:15
+ * @LastEditTime: 2026-03-28 23:53:23
  */
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'pages/plan_page.dart';
 import 'pages/memorial_page.dart';
 
@@ -21,6 +22,14 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '计划&纪念日',
+      // 添加本地化代理
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
