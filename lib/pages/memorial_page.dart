@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lunar/lunar.dart';
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 
 class MemorialDayPage extends StatefulWidget {
   const MemorialDayPage({super.key});
@@ -14,17 +15,13 @@ class MemorialDayPage extends StatefulWidget {
   }) async {
     final titleCtrl = TextEditingController(text: editItem?["title"] ?? "");
 
-    // 解析日期和历法类型
     DateTime? selectedDate;
-    String calendarType =
-        (editItem?["calendarType"] ?? "solar")
-            as String; // solar: 阳历, lunar: 农历
+    String calendarType = (editItem?["calendarType"] ?? "solar") as String;
 
     if (editItem != null && editItem["date"] != null) {
       if (calendarType == "solar") {
         selectedDate = DateTime.parse(editItem["date"]);
       } else {
-        // 农历日期需要从存储的字符串解析
         final lunarStr = editItem["date"] as String;
         final parts = lunarStr.split('-');
         if (parts.length == 3) {
@@ -113,86 +110,8 @@ class MemorialDayPage extends StatefulWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // 历法选择
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.grey[50],
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.calendar_today,
-                            size: 20,
-                            color: Color(0xFF667EEA),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            "历法类型",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SegmentedButton<String>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: 'solar',
-                                  label: Text("阳历"),
-                                  icon: Icon(Icons.wb_sunny, size: 16),
-                                ),
-                                ButtonSegment(
-                                  value: 'lunar',
-                                  label: Text("农历"),
-                                  icon: Icon(Icons.nightlight_round, size: 16),
-                                ),
-                              ],
-                              selected: {calendarType},
-                              onSelectionChanged: (Set<String> newSelection) {
-                                setStateDialog(() {
-                                  calendarType = newSelection.first;
-                                  selectedDate = null; // 切换历法时清空日期
-                                });
-                              },
-                              style: ButtonStyle(
-                                backgroundColor:
-                                    MaterialStateProperty.resolveWith<Color?>((
-                                      Set<MaterialState> states,
-                                    ) {
-                                      if (states.contains(
-                                        MaterialState.selected,
-                                      )) {
-                                        return const Color(
-                                          0xFF667EEA,
-                                        ).withOpacity(0.2);
-                                      }
-                                      return null;
-                                    }),
-                                foregroundColor:
-                                    MaterialStateProperty.resolveWith<Color?>((
-                                      Set<MaterialState> states,
-                                    ) {
-                                      if (states.contains(
-                                        MaterialState.selected,
-                                      )) {
-                                        return const Color(0xFF667EEA);
-                                      }
-                                      return null;
-                                    }),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // 日期选择
+
+                    // 日期选择（内部自带公历/农历切换）
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
@@ -211,28 +130,15 @@ class MemorialDayPage extends StatefulWidget {
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () async {
-                            if (calendarType == "solar") {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: selectedDate ?? DateTime.now(),
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (date != null) {
-                                setStateDialog(() => selectedDate = date);
-                              }
-                            } else {
-                              // 农历日期选择器
-                              await _showLunarDatePicker(
-                                context,
-                                selectedDate,
-                                (lunarDate) {
-                                  setStateDialog(
-                                    () => selectedDate = lunarDate,
-                                  );
-                                },
-                              );
-                            }
+                            await _showLunarDatePicker(context, selectedDate, (
+                              lunarDate,
+                              pickedCalType,
+                            ) {
+                              setStateDialog(() {
+                                selectedDate = lunarDate;
+                                calendarType = pickedCalType;
+                              });
+                            });
                           },
                           borderRadius: BorderRadius.circular(16),
                           child: Container(
@@ -241,9 +147,7 @@ class MemorialDayPage extends StatefulWidget {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  calendarType == "solar"
-                                      ? Icons.calendar_today
-                                      : Icons.nightlight_round,
+                                  Icons.calendar_today,
                                   size: 20,
                                   color: Colors.grey[600],
                                 ),
@@ -269,8 +173,9 @@ class MemorialDayPage extends StatefulWidget {
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 16),
-                    // 重复选择
+                    // 重复周期
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
@@ -324,36 +229,24 @@ class MemorialDayPage extends StatefulWidget {
                                 ),
                               ],
                               selected: {selectedRepeatType},
-                              onSelectionChanged: (Set<String?> newSelection) {
-                                setStateDialog(() {
-                                  selectedRepeatType = newSelection.first;
-                                });
-                              },
+                              onSelectionChanged: (newValue) => setStateDialog(
+                                () => selectedRepeatType = newValue.first,
+                              ),
                               style: ButtonStyle(
                                 backgroundColor:
-                                    MaterialStateProperty.resolveWith<Color?>((
-                                      Set<MaterialState> states,
-                                    ) {
-                                      if (states.contains(
-                                        MaterialState.selected,
-                                      )) {
-                                        return const Color(
-                                          0xFF667EEA,
-                                        ).withOpacity(0.2);
-                                      }
-                                      return null;
-                                    }),
+                                    MaterialStateProperty.resolveWith(
+                                      (s) => s.contains(MaterialState.selected)
+                                          ? const Color(
+                                              0xFF667EEA,
+                                            ).withOpacity(0.2)
+                                          : null,
+                                    ),
                                 foregroundColor:
-                                    MaterialStateProperty.resolveWith<Color?>((
-                                      Set<MaterialState> states,
-                                    ) {
-                                      if (states.contains(
-                                        MaterialState.selected,
-                                      )) {
-                                        return const Color(0xFF667EEA);
-                                      }
-                                      return null;
-                                    }),
+                                    MaterialStateProperty.resolveWith(
+                                      (s) => s.contains(MaterialState.selected)
+                                          ? const Color(0xFF667EEA)
+                                          : null,
+                                    ),
                               ),
                             ),
                           ),
@@ -449,7 +342,6 @@ class MemorialDayPage extends StatefulWidget {
 
   static String _getDateDisplayText(DateTime? date, String calendarType) {
     if (date == null) return "选择日期";
-
     if (calendarType == "solar") {
       return "${date.year}年${date.month}月${date.day}日";
     } else {
@@ -462,191 +354,301 @@ class MemorialDayPage extends StatefulWidget {
   static Future<void> _showLunarDatePicker(
     BuildContext context,
     DateTime? currentDate,
-    Function(DateTime) onConfirm,
+    Function(DateTime, String) onConfirm,
   ) async {
-    int year = currentDate?.year ?? DateTime.now().year;
-    int month = currentDate?.month ?? DateTime.now().month;
-    int day = currentDate?.day ?? DateTime.now().day;
+    DateTime selectedDate = currentDate ?? DateTime.now();
+    String calendarType = 'solar';
+
+    int lunarYear = selectedDate.year;
+    int lunarMonth = selectedDate.month;
+    int lunarDay = selectedDate.day;
+
+    int solarYear = selectedDate.year;
+    int solarMonth = selectedDate.month;
+    int solarDay = selectedDate.day;
+
+    List<int> years = List.generate(201, (i) => 1949 + i);
+    List<int> months = List.generate(12, (i) => i + 1);
+
+    int getLunarDaysCount(int year, int month) {
+      try {
+        for (int day = 30; day >= 1; day--) {
+          try {
+            Lunar.fromYmd(year, month, day);
+            return day;
+          } catch (_) {}
+        }
+      } catch (_) {}
+      return 29;
+    }
+
+    int getSolarDaysCount(int year, int month) =>
+        DateTime(year, month + 1, 0).day;
 
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("选择农历日期"),
-            content: SizedBox(
-              width: 300,
-              height: 350,
+          return Dialog(
+            insetPadding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Container(
+              height: 400,
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.chevron_left),
-                        onPressed: () {
-                          setState(() {
-                            year--;
-                          });
-                        },
+                      const Text(
+                        "选择日期",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF667EEA),
+                        ),
                       ),
-                      Text("$year年", style: const TextStyle(fontSize: 18)),
-                      IconButton(
-                        icon: const Icon(Icons.chevron_right),
-                        onPressed: () {
+                      SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(value: 'solar', label: Text("公历")),
+                          ButtonSegment(value: 'lunar', label: Text("农历")),
+                        ],
+                        selected: {calendarType},
+                        onSelectionChanged: (newSel) {
                           setState(() {
-                            year++;
+                            calendarType = newSel.first;
+                            if (calendarType == 'solar') {
+                              solarYear = selectedDate.year;
+                              solarMonth = selectedDate.month;
+                              solarDay = selectedDate.day;
+                            } else {
+                              final lunar = Solar.fromDate(
+                                selectedDate,
+                              ).getLunar();
+                              lunarYear = lunar.getYear();
+                              lunarMonth = lunar.getMonth();
+                              lunarDay = lunar.getDay();
+                            }
                           });
                         },
+                        style: ButtonStyle(
+                          backgroundColor: MaterialStateProperty.resolveWith(
+                            (s) => s.contains(MaterialState.selected)
+                                ? const Color(0xFF667EEA).withOpacity(0.2)
+                                : null,
+                          ),
+                          foregroundColor: MaterialStateProperty.resolveWith(
+                            (s) => s.contains(MaterialState.selected)
+                                ? const Color(0xFF667EEA)
+                                : null,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "选择月份",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 20),
                   Expanded(
-                    flex: 1,
-                    child: GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            childAspectRatio: 1.2,
-                          ),
-                      itemCount: 12,
-                      itemBuilder: (context, index) {
-                        final lunarMonth = index + 1;
-                        final isSelected = month == lunarMonth;
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              month = lunarMonth;
-                            });
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF667EEA)
-                                  : Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                "${lunarMonth}月",
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.black87,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: FixedExtentScrollController(
+                              initialItem: years.indexOf(
+                                calendarType == 'solar' ? solarYear : lunarYear,
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "选择日期",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    flex: 2,
-                    child: GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 7,
-                            childAspectRatio: 1.2,
-                          ),
-                      itemCount: 30,
-                      itemBuilder: (context, index) {
-                        final lunarDay = index + 1;
-                        final isSelected = day == lunarDay;
-                        // 检查该农历日期是否有效
-                        bool isValid = true;
-                        try {
-                          final lunar = Lunar.fromYmd(year, month, lunarDay);
-                          lunar.getSolar();
-                        } catch (e) {
-                          isValid = false;
-                        }
-
-                        return InkWell(
-                          onTap: isValid
-                              ? () {
-                                  setState(() {
-                                    day = lunarDay;
-                                  });
+                            itemExtent: 40,
+                            onSelectedItemChanged: (index) {
+                              setState(() {
+                                if (calendarType == 'solar') {
+                                  solarYear = years[index];
+                                  int max = getSolarDaysCount(
+                                    solarYear,
+                                    solarMonth,
+                                  );
+                                  if (solarDay > max) solarDay = max;
+                                  selectedDate = DateTime(
+                                    solarYear,
+                                    solarMonth,
+                                    solarDay,
+                                  );
+                                } else {
+                                  lunarYear = years[index];
+                                  int max = getLunarDaysCount(
+                                    lunarYear,
+                                    lunarMonth,
+                                  );
+                                  if (lunarDay > max) lunarDay = max;
+                                  try {
+                                    final l = Lunar.fromYmd(
+                                      lunarYear,
+                                      lunarMonth,
+                                      lunarDay,
+                                    );
+                                    final s = l.getSolar();
+                                    selectedDate = DateTime(
+                                      s.getYear(),
+                                      s.getMonth(),
+                                      s.getDay(),
+                                    );
+                                  } catch (_) {}
                                 }
-                              : null,
-                          child: Container(
-                            margin: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF667EEA)
-                                  : (isValid
-                                        ? Colors.grey[200]
-                                        : Colors.grey[100]),
-                              borderRadius: BorderRadius.circular(4),
+                              });
+                            },
+                            children: years
+                                .map(
+                                  (y) => Center(
+                                    child: Text(
+                                      "$y年",
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: FixedExtentScrollController(
+                              initialItem:
+                                  (calendarType == 'solar'
+                                      ? solarMonth
+                                      : lunarMonth) -
+                                  1,
                             ),
-                            child: Center(
-                              child: Text(
-                                "$lunarDay",
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : (isValid
-                                            ? Colors.black87
-                                            : Colors.grey[400]),
-                                  fontSize: 12,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                            itemExtent: 40,
+                            onSelectedItemChanged: (index) {
+                              setState(() {
+                                if (calendarType == 'solar') {
+                                  solarMonth = index + 1;
+                                  int max = getSolarDaysCount(
+                                    solarYear,
+                                    solarMonth,
+                                  );
+                                  if (solarDay > max) solarDay = max;
+                                  selectedDate = DateTime(
+                                    solarYear,
+                                    solarMonth,
+                                    solarDay,
+                                  );
+                                } else {
+                                  lunarMonth = index + 1;
+                                  int max = getLunarDaysCount(
+                                    lunarYear,
+                                    lunarMonth,
+                                  );
+                                  if (lunarDay > max) lunarDay = max;
+                                  try {
+                                    final l = Lunar.fromYmd(
+                                      lunarYear,
+                                      lunarMonth,
+                                      lunarDay,
+                                    );
+                                    final s = l.getSolar();
+                                    selectedDate = DateTime(
+                                      s.getYear(),
+                                      s.getMonth(),
+                                      s.getDay(),
+                                    );
+                                  } catch (_) {}
+                                }
+                              });
+                            },
+                            children: months
+                                .map(
+                                  (m) => Center(
+                                    child: Text(
+                                      "$m月",
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: FixedExtentScrollController(
+                              initialItem:
+                                  (calendarType == 'solar'
+                                      ? solarDay
+                                      : lunarDay) -
+                                  1,
+                            ),
+                            itemExtent: 40,
+                            onSelectedItemChanged: (index) {
+                              setState(() {
+                                if (calendarType == 'solar') {
+                                  solarDay = index + 1;
+                                  selectedDate = DateTime(
+                                    solarYear,
+                                    solarMonth,
+                                    solarDay,
+                                  );
+                                } else {
+                                  lunarDay = index + 1;
+                                  try {
+                                    final l = Lunar.fromYmd(
+                                      lunarYear,
+                                      lunarMonth,
+                                      lunarDay,
+                                    );
+                                    final s = l.getSolar();
+                                    selectedDate = DateTime(
+                                      s.getYear(),
+                                      s.getMonth(),
+                                      s.getDay(),
+                                    );
+                                  } catch (_) {}
+                                }
+                              });
+                            },
+                            children: List.generate(
+                              calendarType == 'solar'
+                                  ? getSolarDaysCount(solarYear, solarMonth)
+                                  : getLunarDaysCount(lunarYear, lunarMonth),
+                              (i) => Center(
+                                child: Text(
+                                  "${i + 1}日",
+                                  style: const TextStyle(fontSize: 16),
                                 ),
                               ),
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("取消"),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            onConfirm(selectedDate, calendarType);
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF667EEA),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text("确定"),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("取消"),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  try {
-                    final lunar = Lunar.fromYmd(year, month, day);
-                    final solar = lunar.getSolar();
-                    onConfirm(
-                      DateTime(
-                        solar.getYear(),
-                        solar.getMonth(),
-                        solar.getDay(),
-                      ),
-                    );
-                    Navigator.pop(context);
-                  } catch (e) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text("无效的农历日期")));
-                  }
-                },
-                child: const Text("确定"),
-              ),
-            ],
           );
         },
       ),
@@ -682,24 +684,21 @@ class MemorialDayPageState extends State<MemorialDayPage>
 
   Future<void> saveList() async {
     final prefs = await SharedPreferences.getInstance();
-    List<String> result = days.map((e) => jsonEncode(e)).toList();
-    await prefs.setStringList("memorialDays", result);
+    await prefs.setStringList(
+      "memorialDays",
+      days.map((e) => jsonEncode(e)).toList(),
+    );
   }
 
   Future<void> deleteItem(int index) async {
     setState(() => fadingItems.add(index));
     await Future.delayed(const Duration(milliseconds: 300));
-
-    final prefs = await SharedPreferences.getInstance();
     setState(() {
       days.removeAt(index);
       fadingItems.remove(index);
       _totalCount = days.length;
     });
-    await prefs.setStringList(
-      "memorialDays",
-      days.map((e) => jsonEncode(e)).toList(),
-    );
+    await saveList();
   }
 
   void _editMemorialDay(int index) {
@@ -725,8 +724,6 @@ class MemorialDayPageState extends State<MemorialDayPage>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
               colors: [Colors.white, const Color(0xFFFEF5F5)],
             ),
             boxShadow: [
@@ -833,7 +830,6 @@ class MemorialDayPageState extends State<MemorialDayPage>
   void _showLongPressMenu(int index) {
     if (_isDragging) return;
     setState(() => selectedIndex = index);
-
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -872,7 +868,7 @@ class MemorialDayPageState extends State<MemorialDayPage>
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
@@ -1016,238 +1012,175 @@ class MemorialDayPageState extends State<MemorialDayPage>
     );
   }
 
-  // 获取实际的日期对象（根据历法转换）
   DateTime _getActualDate(Map<String, dynamic> item) {
     final calendarType = item["calendarType"] as String? ?? "solar";
     final dateStr = item["date"] as String;
-
-    if (calendarType == "solar") {
-      return DateTime.parse(dateStr);
-    } else {
-      // 农历日期
-      final parts = dateStr.split('-');
-      if (parts.length == 3) {
-        final lunar = Lunar.fromYmd(
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-          int.parse(parts[2]),
-        );
-        final solar = lunar.getSolar();
-        return DateTime(solar.getYear(), solar.getMonth(), solar.getDay());
-      }
-      return DateTime.now();
+    if (calendarType == "solar") return DateTime.parse(dateStr);
+    final parts = dateStr.split('-');
+    if (parts.length == 3) {
+      final lunar = Lunar.fromYmd(
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+        int.parse(parts[2]),
+      );
+      final solar = lunar.getSolar();
+      return DateTime(solar.getYear(), solar.getMonth(), solar.getDay());
     }
+    return DateTime.now();
   }
 
-  // 获取下次重复的日期
   DateTime? _getNextRepeatDate(Map<String, dynamic> item) {
     final repeatType = item["repeatType"] as String?;
     if (repeatType == null) return null;
-
     final calendarType = item["calendarType"] as String? ?? "solar";
     final dateStr = item["date"] as String;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // --------------------------
-    // 公历（不变）
-    // --------------------------
     if (calendarType == "solar") {
       final baseDate = DateTime.parse(dateStr);
-      final baseDateOnly = DateTime(
-        baseDate.year,
-        baseDate.month,
-        baseDate.day,
-      );
-
+      final base = DateTime(baseDate.year, baseDate.month, baseDate.day);
       switch (repeatType) {
         case 'week':
-          DateTime nextDate = baseDateOnly;
-          while (nextDate.isBefore(today)) {
-            nextDate = nextDate.add(const Duration(days: 7));
-          }
-          return nextDate;
-
+          var d = base;
+          while (d.isBefore(today)) d = d.add(const Duration(days: 7));
+          return d;
         case 'month':
-          DateTime nextDate = baseDateOnly;
-          while (nextDate.isBefore(today)) {
-            int nextMonth = nextDate.month + 1;
-            int nextYear = nextDate.year;
-            if (nextMonth > 12) {
-              nextMonth = 1;
-              nextYear++;
+          var d = base;
+          while (d.isBefore(today)) {
+            int y = d.year, m = d.month + 1;
+            if (m > 12) {
+              m = 1;
+              y++;
             }
-            int targetDay = baseDateOnly.day;
-            int daysInMonth = DateTime(nextYear, nextMonth + 1, 0).day;
-            if (targetDay > daysInMonth) {
-              targetDay = daysInMonth;
-            }
-            nextDate = DateTime(nextYear, nextMonth, targetDay);
+            int day = base.day;
+            int max = DateTime(y, m + 1, 0).day;
+            if (day > max) day = max;
+            d = DateTime(y, m, day);
           }
-          return nextDate;
-
+          return d;
         case 'year':
-          DateTime nextDate = baseDateOnly;
-          while (nextDate.isBefore(today)) {
-            nextDate = DateTime(
-              nextDate.year + 1,
-              baseDateOnly.month,
-              baseDateOnly.day,
-            );
-          }
-          return nextDate;
+          var d = base;
+          while (d.isBefore(today))
+            d = DateTime(d.year + 1, base.month, base.day);
+          return d;
+        default:
+          return null;
       }
-    }
-    // --------------------------
-    // 农历（已修复 API 版本）
-    // --------------------------
-    else {
+    } else {
       final parts = dateStr.split('-');
       if (parts.length != 3) return null;
-
-      final ly = int.parse(parts[0]);
-      final lm = int.parse(parts[1]);
-      final ld = int.parse(parts[2]);
-
-      // 农历转公历（正确API）
-      final baseLunar = Lunar.fromYmd(ly, lm, ld);
-      final baseSolar = baseLunar.getSolar(); // ✅ 修复
-      DateTime baseDate = DateTime(
-        baseSolar.getYear(),
-        baseSolar.getMonth(),
-        baseSolar.getDay(),
+      final lunar = Lunar.fromYmd(
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+        int.parse(parts[2]),
       );
-
+      final solar = lunar.getSolar();
+      DateTime base = DateTime(
+        solar.getYear(),
+        solar.getMonth(),
+        solar.getDay(),
+      );
       switch (repeatType) {
         case 'week':
-          DateTime nextDate = baseDate;
-          while (nextDate.isBefore(today)) {
-            nextDate = nextDate.add(const Duration(days: 7));
-          }
-          return nextDate;
-
+          var d = base;
+          while (d.isBefore(today)) d = d.add(const Duration(days: 7));
+          return d;
         case 'month':
-          DateTime nextDate = baseDate;
-          while (nextDate.isBefore(today)) {
-            // 公历转农历（正确API）
-            final currentLunar = Solar.fromDate(nextDate).getLunar(); // ✅ 修复
-            int nextYear = currentLunar.getYear();
-            int nextMonth = currentLunar.getMonth() + 1;
-
-            if (nextMonth > 12) {
-              nextMonth = 1;
-              nextYear += 1;
+          var d = base;
+          while (d.isBefore(today)) {
+            final l = Solar.fromDate(d).getLunar();
+            int y = l.getYear(), m = l.getMonth() + 1;
+            if (m > 12) {
+              m = 1;
+              y++;
             }
-
-            DateTime? target = _getLunarDaySafe(nextYear, nextMonth, ld);
-            if (target != null) {
-              nextDate = target;
-            } else {
-              nextDate = nextDate.add(const Duration(days: 1));
-            }
+            DateTime? t = _getLunarDaySafe(y, m, int.parse(parts[2]));
+            if (t != null)
+              d = t;
+            else
+              d = d.add(const Duration(days: 1));
           }
-          return nextDate;
-
+          return d;
         case 'year':
-          DateTime nextDate = baseDate;
-          while (nextDate.isBefore(today)) {
-            final currentLunar = Solar.fromDate(nextDate).getLunar(); // ✅ 修复
-            int nextYear = currentLunar.getYear() + 1;
-
-            DateTime? target = _getLunarDaySafe(nextYear, lm, ld);
-            if (target != null) {
-              nextDate = target;
-            } else {
-              nextDate = nextDate.add(const Duration(days: 1));
-            }
+          var d = base;
+          while (d.isBefore(today)) {
+            final l = Solar.fromDate(d).getLunar();
+            int y = l.getYear() + 1;
+            DateTime? t = _getLunarDaySafe(
+              y,
+              int.parse(parts[1]),
+              int.parse(parts[2]),
+            );
+            if (t != null)
+              d = t;
+            else
+              d = d.add(const Duration(days: 1));
           }
-          return nextDate;
+          return d;
+        default:
+          return null;
       }
     }
-
-    return null;
   }
 
-  // 工具函数
-  DateTime? _getLunarDaySafe(int year, int month, int day) {
+  DateTime? _getLunarDaySafe(int y, int m, int d) {
     try {
-      final lunar = Lunar.fromYmd(year, month, day);
-      final solar = lunar.getSolar(); // ✅ 修复
-      return DateTime(solar.getYear(), solar.getMonth(), solar.getDay());
-    } catch (e) {
-      try {
-        for (int d = day; d >= 1; d--) {
-          try {
-            final lunar = Lunar.fromYmd(year, month, d);
-            final solar = lunar.getSolar(); // ✅ 修复
-            return DateTime(solar.getYear(), solar.getMonth(), solar.getDay());
-          } catch (_) {}
-        }
-      } catch (_) {}
+      final l = Lunar.fromYmd(y, m, d);
+      final s = l.getSolar();
+      return DateTime(s.getYear(), s.getMonth(), s.getDay());
+    } catch (_) {
+      for (int day = d; day >= 1; day--) {
+        try {
+          final l = Lunar.fromYmd(y, m, day);
+          final s = l.getSolar();
+          return DateTime(s.getYear(), s.getMonth(), s.getDay());
+        } catch (_) {}
+      }
     }
     return null;
   }
 
-  // 获取显示文本
   String _getDisplayText(Map<String, dynamic> item) {
-    final repeatType = item["repeatType"] as String?;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-
-    // 重复类型：显示距离下一个重复日期的天数
-    if (repeatType != null) {
-      final nextDate = _getNextRepeatDate(item);
-      if (nextDate != null) {
-        final nextDateOnly = DateTime(
-          nextDate.year,
-          nextDate.month,
-          nextDate.day,
-        );
-        final daysLeft = nextDateOnly.difference(today).inDays;
-
-        if (daysLeft == 0) return "今天";
-        if (daysLeft == 1) return "明天";
-        if (daysLeft > 0) return "还有$daysLeft天";
-        return "已过${-daysLeft}天";
-      }
-      return "计算错误";
+    final repeat = item["repeatType"];
+    if (repeat != null) {
+      final next = _getNextRepeatDate(item);
+      if (next == null) return "计算错误";
+      final n = DateTime(next.year, next.month, next.day);
+      final diff = n.difference(today).inDays;
+      if (diff == 0) return "今天";
+      if (diff == 1) return "明天";
+      if (diff > 0) return "还有$diff天";
+      return "已过${-diff}天";
+    } else {
+      final t = _getActualDate(item);
+      final dt = DateTime(t.year, t.month, t.day);
+      final diff = dt.difference(today).inDays;
+      if (diff == 0) return "今天";
+      if (diff == 1) return "明天";
+      if (diff > 0) return "还有$diff天";
+      if (diff == -1) return "昨天";
+      return "${-diff}天";
     }
-
-    // 不重复：显示距离目标日期的天数
-    final targetDate = _getActualDate(item);
-    final targetDateOnly = DateTime(
-      targetDate.year,
-      targetDate.month,
-      targetDate.day,
-    );
-    final difference = targetDateOnly.difference(today).inDays;
-
-    if (difference == 0) return "今天";
-    if (difference == 1) return "明天";
-    if (difference > 0) return "还有$difference天";
-    if (difference == -1) return "昨天";
-    return "${-difference}天";
   }
 
   String _getDateDisplayText(Map<String, dynamic> item) {
-    final calendarType = item["calendarType"] as String? ?? "solar";
-    final dateStr = item["date"] as String;
-
-    if (calendarType == "solar") {
-      final date = DateTime.parse(dateStr);
-      return "${date.year}年${date.month}月${date.day}日";
+    final cal = item["calendarType"] ?? "solar";
+    final date = item["date"];
+    if (cal == "solar") {
+      final d = DateTime.parse(date);
+      return "${d.year}年${d.month}月${d.day}日";
     } else {
-      final parts = dateStr.split('-');
-      if (parts.length == 3) {
-        return "${parts[0]}年${parts[1]}月${parts[2]}日 (农历)";
-      }
-      return dateStr;
+      final p = date.split('-');
+      if (p.length == 3) return "${p[0]}年${p[1]}月${p[2]}日 (农历)";
+      return date;
     }
   }
 
-  // 获取重复类型的图标和颜色
-  (IconData, Color) _getRepeatIcon(String? repeatType) {
-    switch (repeatType) {
+  (IconData, Color) _getRepeatIcon(String? t) {
+    switch (t) {
       case 'week':
         return (Icons.calendar_view_week, Colors.green);
       case 'month':
@@ -1259,17 +1192,16 @@ class MemorialDayPageState extends State<MemorialDayPage>
     }
   }
 
-  // 获取重复周期的显示文本
-  String _getRepeatText(String? repeatType) {
-    switch (repeatType) {
+  String _getRepeatText(String? t) {
+    switch (t) {
       case 'week':
-        return '每周';
+        return "每周";
       case 'month':
-        return '每月';
+        return "每月";
       case 'year':
-        return '每年';
+        return "每年";
       default:
-        return '';
+        return "";
     }
   }
 
@@ -1295,40 +1227,33 @@ class MemorialDayPageState extends State<MemorialDayPage>
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               height: 48,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF667EEA).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF667EEA).withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.celebration,
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.celebration, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    "纪念日 $_totalCount",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                       color: Colors.white,
-                      size: 20,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "纪念日 $_totalCount",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -1368,109 +1293,88 @@ class MemorialDayPageState extends State<MemorialDayPage>
                       ),
                       itemCount: days.length,
                       buildDefaultDragHandles: false,
-                      proxyDecorator: (child, index, animation) {
-                        return AnimatedBuilder(
-                          animation: animation,
-                          builder: (context, child) {
-                            final value = CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOutBack,
-                            ).value;
-                            return Transform.scale(
-                              scale: 0.95 + (value * 0.05),
-                              child: Material(
-                                elevation: 8,
-                                color: Colors.transparent,
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: child,
-                        );
-                      },
-                      onReorderStart: (index) {
-                        _isDragging = true;
-                      },
-                      onReorder: (oldIndex, newIndex) {
-                        if (newIndex > oldIndex) newIndex--;
-                        final item = days.removeAt(oldIndex);
-                        days.insert(newIndex, item);
+                      proxyDecorator: (child, index, animation) =>
+                          AnimatedBuilder(
+                            animation: animation,
+                            builder: (context, child) {
+                              final v = CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutBack,
+                              ).value;
+                              return Transform.scale(
+                                scale: 0.95 + v * 0.05,
+                                child: Material(
+                                  elevation: 8,
+                                  color: Colors.transparent,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: child,
+                          ),
+                      onReorderStart: (i) => _isDragging = true,
+                      onReorder: (o, n) {
+                        if (n > o) n--;
+                        final item = days.removeAt(o);
+                        days.insert(n, item);
                         setState(() {});
                       },
-                      onReorderEnd: (index) async {
+                      onReorderEnd: (i) async {
                         await saveList();
                         _isDragging = false;
                       },
                       itemBuilder: (c, i) {
                         final item = days[i];
-                        final displayText = _getDisplayText(item);
-                        final repeatType = item["repeatType"] as String?;
-                        final isSelected = selectedIndex == i;
-                        final isFading = fadingItems.contains(i);
-                        final isToday = displayText == "今天";
-                        final isTomorrow = displayText == "明天";
-                        final isPast =
-                            displayText.contains("天") &&
-                            !displayText.contains("还有") &&
-                            displayText != "今天" &&
-                            displayText != "明天" &&
-                            displayText != "昨天";
-                        final isRepeat = repeatType != null;
+                        final text = _getDisplayText(item);
+                        final repeat = item["repeatType"];
+                        final selected = selectedIndex == i;
+                        final fading = fadingItems.contains(i);
+                        final today = text == "今天";
+                        final tomorrow = text == "明天";
+                        final past =
+                            text.contains("天") &&
+                            !text.contains("还有") &&
+                            text != "今天" &&
+                            text != "明天" &&
+                            text != "昨天";
+                        final isRepeat = repeat != null;
+                        final (icon, iconColor) = _getRepeatIcon(repeat);
 
-                        // 获取图标
-                        final (iconData, iconColor) = _getRepeatIcon(
-                          repeatType,
-                        );
-
-                        // 判断显示样式
                         Color badgeColor;
-                        if (isToday) {
+                        Color badgeBg;
+                        if (today) {
                           badgeColor = Colors.pink.shade700;
-                        } else if (isTomorrow) {
+                          badgeBg = Colors.pink.shade100;
+                        } else if (tomorrow) {
                           badgeColor = Colors.orange.shade700;
-                        } else if (displayText.contains("还有")) {
+                          badgeBg = Colors.orange.shade100;
+                        } else if (text.contains("还有")) {
                           badgeColor = Colors.orange.shade700;
-                        } else if (isPast) {
+                          badgeBg = Colors.orange.shade100;
+                        } else if (past) {
                           badgeColor = Colors.blue.shade700;
+                          badgeBg = Colors.blue.shade100;
                         } else {
                           badgeColor = Colors.grey.shade600;
-                        }
-
-                        Color badgeBgColor;
-                        if (isToday) {
-                          badgeBgColor = Colors.pink.shade100;
-                        } else if (isTomorrow) {
-                          badgeBgColor = Colors.orange.shade100;
-                        } else if (displayText.contains("还有")) {
-                          badgeBgColor = Colors.orange.shade100;
-                        } else if (isPast) {
-                          badgeBgColor = Colors.blue.shade100;
-                        } else {
-                          badgeBgColor = Colors.grey.shade100;
+                          badgeBg = Colors.grey.shade100;
                         }
 
                         return Container(
                           key: ValueKey(
-                            item["title"] +
-                                i.toString() +
-                                item["date"] +
-                                (repeatType ?? "") +
-                                (item["calendarType"] ?? ""),
+                            "${item["title"]}$i${item["date"]}${repeat ?? ""}${item["calendarType"] ?? ""}",
                           ),
                           child: ReorderableDragStartListener(
                             index: i,
                             child: TweenAnimationBuilder(
                               duration: const Duration(milliseconds: 300),
                               tween: Tween<double>(begin: 0, end: 1),
-                              builder: (context, value, child) {
-                                return Transform.translate(
-                                  offset: Offset(0, 20 * (1 - value)),
-                                  child: Opacity(opacity: value, child: child),
-                                );
-                              },
+                              builder: (ctx, val, child) => Transform.translate(
+                                offset: Offset(0, 20 * (1 - val)),
+                                child: Opacity(opacity: val, child: child),
+                              ),
                               child: AnimatedOpacity(
                                 duration: const Duration(milliseconds: 300),
-                                opacity: isFading ? 0.0 : 1.0,
+                                opacity: fading ? 0 : 1,
                                 child: GestureDetector(
                                   onDoubleTap: () => _showLongPressMenu(i),
                                   onTap: () =>
@@ -1478,195 +1382,178 @@ class MemorialDayPageState extends State<MemorialDayPage>
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
                                     transform: Matrix4.identity()
-                                      ..scale(isSelected ? 1.02 : 1.0),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 12),
-                                      decoration: BoxDecoration(
+                                      ..scale(selected ? 1.02 : 1.0),
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Card(
+                                      color: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(20),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.05,
-                                            ),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
                                       ),
-                                      child: Card(
-                                        color: Colors.white,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
+                                      child: Container(
+                                        decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
-                                        ),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Colors.white,
-                                                isSelected
-                                                    ? Colors.pink.shade50
-                                                    : Colors.grey.shade50,
-                                              ],
-                                            ),
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              Colors.white,
+                                              selected
+                                                  ? Colors.pink.shade50
+                                                  : Colors.grey.shade50,
+                                            ],
                                           ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.all(
-                                                    10,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    gradient: LinearGradient(
-                                                      colors: isToday
-                                                          ? [
-                                                              Colors
-                                                                  .pink
-                                                                  .shade100,
-                                                              Colors
-                                                                  .pink
-                                                                  .shade200,
-                                                            ]
-                                                          : [
-                                                              Colors
-                                                                  .purple
-                                                                  .shade50,
-                                                              Colors
-                                                                  .purple
-                                                                  .shade100,
-                                                            ],
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          16,
-                                                        ),
-                                                  ),
-                                                  child: Icon(
-                                                    isRepeat
-                                                        ? Icons.repeat
-                                                        : iconData,
-                                                    color: isRepeat
-                                                        ? iconColor
-                                                        : (isToday
-                                                              ? Colors
-                                                                    .pink
-                                                                    .shade700
-                                                              : iconColor),
-                                                    size: 24,
-                                                  ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  10,
                                                 ),
-                                                const SizedBox(width: 16),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Row(
-                                                        children: [
-                                                          Flexible(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: today
+                                                        ? [
+                                                            Colors
+                                                                .pink
+                                                                .shade100,
+                                                            Colors
+                                                                .pink
+                                                                .shade200,
+                                                          ]
+                                                        : [
+                                                            Colors
+                                                                .purple
+                                                                .shade50,
+                                                            Colors
+                                                                .purple
+                                                                .shade100,
+                                                          ],
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                                child: Icon(
+                                                  isRepeat
+                                                      ? Icons.repeat
+                                                      : icon,
+                                                  color: isRepeat
+                                                      ? iconColor
+                                                      : (today
+                                                            ? Colors
+                                                                  .pink
+                                                                  .shade700
+                                                            : iconColor),
+                                                  size: 24,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Flexible(
+                                                          child: Text(
+                                                            item["title"] ?? "",
+                                                            style: TextStyle(
+                                                              fontSize: 18,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color: Colors
+                                                                  .grey[800],
+                                                            ),
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
+                                                        if (isRepeat) ...[
+                                                          const SizedBox(
+                                                            width: 8,
+                                                          ),
+                                                          Container(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal: 6,
+                                                                  vertical: 2,
+                                                                ),
+                                                            decoration: BoxDecoration(
+                                                              color: iconColor
+                                                                  .withOpacity(
+                                                                    0.1,
+                                                                  ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    8,
+                                                                  ),
+                                                            ),
                                                             child: Text(
-                                                              item["title"] ??
-                                                                  "",
+                                                              _getRepeatText(
+                                                                repeat,
+                                                              ),
                                                               style: TextStyle(
-                                                                fontSize: 18,
+                                                                fontSize: 10,
+                                                                color:
+                                                                    iconColor,
                                                                 fontWeight:
                                                                     FontWeight
-                                                                        .w600,
-                                                                color: Colors
-                                                                    .grey[800],
+                                                                        .w500,
                                                               ),
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
                                                             ),
                                                           ),
-                                                          if (isRepeat) ...[
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            Container(
-                                                              padding:
-                                                                  const EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        6,
-                                                                    vertical: 2,
-                                                                  ),
-                                                              decoration: BoxDecoration(
-                                                                color: iconColor
-                                                                    .withOpacity(
-                                                                      0.1,
-                                                                    ),
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      8,
-                                                                    ),
-                                                              ),
-                                                              child: Text(
-                                                                _getRepeatText(
-                                                                  repeatType,
-                                                                ),
-                                                                style: TextStyle(
-                                                                  fontSize: 10,
-                                                                  color:
-                                                                      iconColor,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
                                                         ],
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        _getDateDisplayText(
-                                                          item,
-                                                        ),
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color:
-                                                              Colors.grey[500],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: badgeBgColor,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          20,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    displayText,
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: badgeColor,
+                                                      ],
                                                     ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      _getDateDisplayText(item),
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[500],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: badgeBg,
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  text,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: badgeColor,
                                                   ),
                                                 ),
-                                              ],
-                                            ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
