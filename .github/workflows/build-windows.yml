@@ -1,8 +1,6 @@
 name: Build Windows Release
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -14,17 +12,20 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          flutter-version: '3.22.0'  # 👈 固定这个版本
           channel: stable
 
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Upload artifact
+      - name: Upload Release
         uses: actions/upload-artifact@v4
         with:
-          name: windows-exe
+          name: Windows-Release
           path: build/windows/runner/Release/
