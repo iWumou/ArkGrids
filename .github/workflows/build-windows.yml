@@ -12,20 +12,23 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'  # 👈 固定这个版本
+          flutter-version: '3.41.6'  # 👈 这个版本完全匹配你的项目！
           channel: stable
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Disable analytics
+        run: flutter config --no-analytics
 
       - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
 
+      - name: Install dependencies
+        run: flutter pub get
+
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Upload Release
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-Release
+          name: ArkGrids-Win
           path: build/windows/runner/Release/
