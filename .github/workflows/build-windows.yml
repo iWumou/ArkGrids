@@ -6,23 +6,28 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.6'  # 👈 这个版本完全匹配你的项目！
+          flutter-version: '3.41.6'
           channel: stable
 
       - name: Disable analytics
         run: flutter config --no-analytics
 
-      - name: Enable Windows desktop
+      - name: Enable Windows
         run: flutter config --enable-windows-desktop
 
-      - name: Install dependencies
+      - name: Get dependencies
         run: flutter pub get
+
+      - name: Create windows platform
+        run: flutter create --platforms=windows .
 
       - name: Build Windows
         run: flutter build windows --release
